@@ -5,8 +5,10 @@ from datetime import datetime
 import numpy as np
 from collections import deque
 from keras.models import load_model
-
+import os 
 app = Flask(__name__)
+
+import os
 
 def save_annotated_video(input_video, output_video):
     print("Loading model ...")
@@ -25,6 +27,9 @@ def save_annotated_video(input_video, output_video):
     violence_detected = False
     violence_start_frame = None
     frame_count = 0
+    clip_count = 0
+    clip_dir = 'clips'
+    os.makedirs(clip_dir, exist_ok=True)
 
     # Define the codec and create a VideoWriter object
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
@@ -47,60 +52,44 @@ def save_annotated_video(input_video, output_video):
         frame = cv2.resize(frame, (128, 128)).astype("float32")
         frame = frame.reshape(128, 128, 3) / 255
 
-        # preds = model.predict(np.expand_dims(frame, axis=0))[0]
-        # Q.append(preds)
-
-        # results = np.array(Q).mean(axis=0)
-        # i = (preds > 0.50)[0]
-        # prediction_history.append(i)
-
-        # smoothed_prediction = np.mean(prediction_history) > 0.5
-        # label = smoothed_prediction
-
         preds = model.predict(np.expand_dims(frame, axis=0))[0]
         Q.append(preds)
 
         results = np.array(Q).mean(axis=0)
         violence_percentage = results[0] * 100  # Assuming the index 0 corresponds to violence probability
 
-        # Here, 'violence_percentage' represents the percentage of violence detected in the frame
-
-        # Optionally, you can adjust the threshold to determine violence based on the percentage
-        threshold_percentage = 50  # Adjust the threshold as needed
-
-        label = violence_percentage > threshold_percentage
-
-        text_color = (0, 255, 0)
+        label = violence_percentage > 50  # Adjust the threshold as needed
 
         if label:
-            text_color = (0, 0, 255)
-
             if not violence_detected:
                 violence_detected = True
                 violence_start_frame = frame_count
-                violence_start_time = time.time()
+                clip_start_frame = max(0, violence_start_frame - 5 * 30)  # 5 seconds before violence start
+                vs.set(cv2.CAP_PROP_POS_FRAMES, clip_start_frame)
         else:
-            violence_detected = False
+            if violence_detected:
+                clip_end_frame = frame_count
+                # Capture the current timestamp
+                current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-        if violence_detected and frame_count == violence_start_frame + 30:
-            # Capture the current timestamp
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                # Save the clip
+                clip_name = os.path.join(clip_dir, f'clip_{current_time}.avi')
+                clip_out = cv2.VideoWriter(clip_name, fourcc, 30.0, (W, H))
+                for i in range(clip_start_frame, clip_end_frame):
+                    vs.set(cv2.CAP_PROP_POS_FRAMES, i)
+                    ret, frame = vs.read()
+                    if ret:
+                        clip_out.write(frame)
+                clip_out.release()
+                clip_count += 1
 
-            # Send the alert with timestamp to the Telegram group
-            message = f"Violence detected at {current_time}"
-            with open('alert_frame.jpg', 'wb') as f:
-                cv2.imwrite('alert_frame.jpg', frame * 255)
+                violence_detected = False
 
-        # text = "Violence: {}".format(label)
+        text_color = (0, 255, 0) if not label else (0, 0, 255)
         text = "Violence: {:.2f}%".format(violence_percentage)
-
         FONT = cv2.FONT_HERSHEY_SIMPLEX
-
         cv2.putText(output, text, (35, 50), FONT, 1.25, text_color, 3)
-
-        # Write the frame with annotations to the output video
         out.write(output)
-
         cv2.imshow("Violence Detection", output)
 
         key = cv2.waitKey(1) & 0xFF
@@ -113,6 +102,8 @@ def save_annotated_video(input_video, output_video):
     vs.release()
     out.release()  # Release the output video writer
     cv2.destroyAllWindows()
+    print(f"{clip_count} clips saved in {clip_dir}")
+
 
 # Define the route to the homepage
 @app.route('/')
