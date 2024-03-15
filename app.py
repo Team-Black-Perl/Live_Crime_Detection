@@ -25,7 +25,7 @@ print(geo_data['region'])
 
 def save_annotated_video(input_video, output_video):
     print("Loading model ...")
-    model = load_model('model/modelnew.h5')
+    model = load_model('modelnew.h5')
     Q = deque(maxlen=128)
 
     # Check if the input_video is an integer (webcam) or a filename
@@ -62,15 +62,28 @@ def save_annotated_video(input_video, output_video):
         frame = cv2.resize(frame, (128, 128)).astype("float32")
         frame = frame.reshape(128, 128, 3) / 255
 
+        # preds = model.predict(np.expand_dims(frame, axis=0))[0]
+        # Q.append(preds)
+
+        # results = np.array(Q).mean(axis=0)
+        # i = (preds > 0.50)[0]
+        # prediction_history.append(i)
+
+        # smoothed_prediction = np.mean(prediction_history) > 0.5
+        # label = smoothed_prediction
+
         preds = model.predict(np.expand_dims(frame, axis=0))[0]
         Q.append(preds)
 
         results = np.array(Q).mean(axis=0)
-        i = (preds > 0.50)[0]
-        prediction_history.append(i)
+        violence_percentage = results[0] * 100  # Assuming the index 0 corresponds to violence probability
 
-        smoothed_prediction = np.mean(prediction_history) > 0.5
-        label = smoothed_prediction
+        # Here, 'violence_percentage' represents the percentage of violence detected in the frame
+
+        # Optionally, you can adjust the threshold to determine violence based on the percentage
+        threshold_percentage = 50  # Adjust the threshold as needed
+
+        label = violence_percentage > threshold_percentage
 
         text_color = (0, 255, 0)
 
@@ -93,7 +106,9 @@ def save_annotated_video(input_video, output_video):
             with open('alert_frame.jpg', 'wb') as f:
                 cv2.imwrite('alert_frame.jpg', frame * 255)
 
-        text = "Violence: {}".format(label)
+        # text = "Violence: {}".format(label)
+        text = "Violence: {:.2f}%".format(violence_percentage)
+
         FONT = cv2.FONT_HERSHEY_SIMPLEX
 
         cv2.putText(output, text, (35, 50), FONT, 1.25, text_color, 3)
