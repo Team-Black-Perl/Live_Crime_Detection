@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 def save_annotated_video(input_video, output_video, telegram_group_id):
     print("Loading model ...")
-    model = load_model('modelnew.h5')
+    model = load_model('model/modelnew.h5')
     Q = deque(maxlen=128)
 
     # Check if the input_video is an integer (webcam) or a filename
