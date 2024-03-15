@@ -8,7 +8,7 @@ from keras.models import load_model
 
 app = Flask(__name__)
 
-def save_annotated_video(input_video, output_video, telegram_group_id):
+def save_annotated_video(input_video, output_video):
     print("Loading model ...")
     model = load_model('modelnew.h5')
     Q = deque(maxlen=128)
@@ -77,7 +77,6 @@ def save_annotated_video(input_video, output_video, telegram_group_id):
             message = f"Violence detected at {current_time}"
             with open('alert_frame.jpg', 'wb') as f:
                 cv2.imwrite('alert_frame.jpg', frame * 255)
-                bot.sendPhoto(telegram_group_id, open('alert_frame.jpg', 'rb'), caption=message)
 
         text = "Violence: {}".format(label)
         FONT = cv2.FONT_HERSHEY_SIMPLEX
@@ -111,12 +110,15 @@ def detect_crime():
     if 'source' in request.form:
         source = request.form['source']
 
+        video_file = request.files['video_file']
+        if video_file.filename != '':
+            video_file.save('video.mp4')
+
         # You can replace '0' with the actual webcam source number if needed.
-        input_video = 0 if source == 'webcam' else 'your_video.mp4'
+        input_video = 0 if source == 'webcam' else 'video.mp4'
 
         output_video_file = 'annotated_video.avi'
-        telegram_group_id = 'your_telegram_group_id'  # Replace with your Telegram group ID
-        save_annotated_video(input_video, output_video_file, telegram_group_id)
+        save_annotated_video(input_video, output_video_file)
 
     return redirect(url_for('index'))
 
