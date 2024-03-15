@@ -5,10 +5,23 @@ from datetime import datetime
 import numpy as np
 from collections import deque
 from keras.models import load_model
-import os 
+import requests
+
 app = Flask(__name__)
 
-import os
+r=requests.get('https://www.geojs.io/')
+ip_req=requests.get('https://get.geojs.io/v1/ip.json')
+ipAdd=ip_req.json()['ip']
+print(ipAdd)
+
+url='https://get.geojs.io/v1/ip/geo/'+ipAdd+'.json'
+geo_req=requests.get(url)
+geo_data=geo_req.json()
+#print(geo_data)
+print('longitude : '+geo_data['longitude'])
+print('latitude : '+geo_data['latitude'])
+print(geo_data['city'])
+print(geo_data['region'])
 
 def save_annotated_video(input_video, output_video):
     print("Loading model ...")
