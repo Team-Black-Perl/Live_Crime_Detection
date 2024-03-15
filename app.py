@@ -27,6 +27,8 @@ print(geo_data['region'])
 
 model = load_model('model/modelnew.h5')
 
+global clip_processing
+
 
 def save_clip(vs, clip_out, clip_start, clip_end):
     vs.set(cv2.CAP_PROP_POS_FRAMES, clip_start)
@@ -35,6 +37,7 @@ def save_clip(vs, clip_out, clip_start, clip_end):
         if ret:
             clip_out.write(clip_frame)
     clip_out.release()
+    clip_processing = False
 
 
 def save_annotated_video(input_video, output_video):
@@ -64,6 +67,8 @@ def save_annotated_video(input_video, output_video):
 
     smoothing_window = 10  # Adjust the window size for smoothing
     prediction_history = deque(maxlen=smoothing_window)
+    
+    clip_processing = False
 
     while True:
         (grabbed, frame) = vs.read()
@@ -94,34 +99,37 @@ def save_annotated_video(input_video, output_video):
                 violence_start_frame = frame_count
         else:
             if violence_detected:
-                # 5 seconds before violence
-                clip_start_frame = max(0, frame_count - 10 * 30)
-                # Calculate the clip end frame based on max_clip_duration
-                clip_end_frame = frame_count + max_clip_duration * 30  # 10 seconds after violence
+                if not clip_processing:
+                    clip_processing = True
+                    # 5 seconds before violence
+                    clip_start_frame = max(0, frame_count - 10 * 30)
+                    # Calculate the clip end frame based on max_clip_duration
+                    clip_end_frame = frame_count + max_clip_duration * 30  # 10 seconds after violence
 
-                # If the clip exceeds the current frame count, adjust the end frame
-                if webcam:
-                    clip_end_frame = frame_count + max_clip_duration * 30
+                    # If the clip exceeds the current frame count, adjust the end frame
+                    if webcam:
+                        clip_end_frame = frame_count + max_clip_duration * 30
 
-                current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                clip_name = os.path.join(clip_dir, f'clip_{current_time}.avi')
-                clip_out = cv2.VideoWriter(clip_name, fourcc, 30.0, (W, H))
+                    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                    clip_name = os.path.join(
+                        clip_dir, f'clip_{current_time}.avi')
+                    clip_out = cv2.VideoWriter(clip_name, fourcc, 30.0, (W, H))
 
-                # Set video capture to start from clip_start_frame
-                # vs.set(cv2.CAP_PROP_POS_FRAMES, clip_start_frame)
+                    # Set video capture to start from clip_start_frame
+                    # vs.set(cv2.CAP_PROP_POS_FRAMES, clip_start_frame)
 
-                # # Write frames to clip
-                # for i in range(clip_start_frame, clip_end_frame):
-                #     ret, frame = vs.read()
-                #     if ret:
-                #         clip_out.write(frame)
+                    # # Write frames to clip
+                    # for i in range(clip_start_frame, clip_end_frame):
+                    #     ret, frame = vs.read()
+                    #     if ret:
+                    #         clip_out.write(frame)
 
-                clip_thread = threading.Thread(
-                    target=save_clip, args=(vs, clip_out, clip_start_frame, clip_end_frame))
-                clip_thread.start()
+                    clip_thread = threading.Thread(
+                        target=save_clip, args=(vs, clip_out, clip_start_frame, clip_end_frame))
+                    clip_thread.start()
 
-                clip_count += 1
-                violence_detected = False
+                    clip_count += 1
+                    violence_detected = False
 
         text_color = (0, 255, 0) if not label else (0, 0, 255)
         text = "Violence: {:.2f}%".format(violence_percentage)
