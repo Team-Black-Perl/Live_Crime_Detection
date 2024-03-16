@@ -20,10 +20,10 @@ url = 'https://get.geojs.io/v1/ip/geo/'+ipAdd+'.json'
 geo_req = requests.get(url)
 geo_data = geo_req.json()
 # print(geo_data)
-print('longitude : '+geo_data['longitude'])
-print('latitude : '+geo_data['latitude'])
-print(geo_data['city'])
-print(geo_data['region'])
+# print('longitude : '+geo_data['longitude'])
+# print('latitude : '+geo_data['latitude'])
+# print(geo_data['city'])
+# print(geo_data['region'])
 
 model = load_model('model/modelnew.h5')
 
@@ -31,7 +31,22 @@ clip_processing = False
 clip_processing_lock = threading.Lock()
 
 
-def save_clip(vs, clip_out, clip_start, clip_end):
+def send_video_request(clip_name):
+    clip_dir = 'clips'
+    clip_files = os.listdir(clip_dir)
+    url = 'http://localhost:3000/alert'
+    for clip_file in clip_files:
+        if clip_name == clip_file:
+            clip_path = os.path.join(clip_dir, clip_file)
+            files = {'file': open(clip_path, 'rb')}
+            data = {"user_id": 1, "ip_address": "3219-31",
+                    "long": float(12.332), "lat": float(12.332)}
+            response = requests.post(url, files=files, data=data)
+            print(response)
+            break
+
+
+def save_clip(vs, clip_out, clip_start, clip_end, clip_name):
     global clip_processing
     global clip_processing_lock
 
@@ -42,7 +57,8 @@ def save_clip(vs, clip_out, clip_start, clip_end):
             if ret:
                 clip_out.write(clip_frame)
         clip_out.release()
-
+        print(f"Clip saved: {clip_out}")
+        send_video_request(clip_name)
     finally:
         with clip_processing_lock:
             clip_processing = False
@@ -72,9 +88,9 @@ def save_annotated_video(input_video, output_video):
         max_clip_duration = 10  # Maximum clip duration in seconds
 
         # Define the codec and create a VideoWriter object
-        fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         # Adjust the resolution as needed
-        out = cv2.VideoWriter(output_video, fourcc, 30.0, (1280, 720))
+        out = cv2.VideoWriter(output_video, 0X00000021, 30.0, (1280, 720))
 
         smoothing_window = 10  # Adjust the window size for smoothing
         prediction_history = deque(maxlen=smoothing_window)
@@ -111,17 +127,17 @@ def save_annotated_video(input_video, output_video):
             else:
                 if not clip_processing:
                     with clip_processing_lock:
-                        if not clip_processing:
+                        if not clip_processing and violence_detected:
                             clip_processing = True
                             # 5 seconds before violence
-                            clip_start_frame = max(0, frame_count - 10 * 30)
+                            clip_start_frame = max(0, frame_count - (5 * 30))
                             # Calculate the clip end frame based on max_clip_duration
                             # 10 seconds after violence
                             clip_end_frame = frame_count + max_clip_duration * 30
 
                             # If the clip exceeds the current frame count, adjust the end frame
                             if webcam:
-                                clip_end_frame = frame_count + max_clip_duration * 30
+                                clip_end_frame = frame_count + (10 * 30)
 
                             current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                             clip_name = os.path.join(
@@ -139,7 +155,7 @@ def save_annotated_video(input_video, output_video):
                             #         clip_out.write(frame)
 
                             clip_thread = threading.Thread(
-                                target=save_clip, args=(vs, clip_out, clip_start_frame, clip_end_frame))
+                                target=save_clip, args=(vs, clip_out, clip_start_frame, clip_end_frame, os.path.basename(clip_name)))
                             clip_thread.start()
 
                             clip_count += 1
